@@ -20,7 +20,8 @@ class ServerlessBackendStack(Stack):
                                     description="The name of the Amazon S3 bucket where uploaded images will be stored.")
         user_pool = _cognito.UserPool(self, "UserPool")
         user_pool.add_client("app-client", auth_flows=_cognito.AuthFlow(
-            user_password=True
+            user_password=True,
+            user_srp=True
         ),
             supported_identity_providers=[
                 _cognito.UserPoolClientIdentityProvider.COGNITO]
@@ -33,7 +34,14 @@ class ServerlessBackendStack(Stack):
             name='userid', type=_dynamodb.AttributeType.STRING)) #change primary key here
         my_bucket = _s3.Bucket(self, id='s3bucket',
                                bucket_name=bucket_name.value_as_string)
-        my_lambda = _lambda.Function(self, id='lambdafunction', function_name="formlambda", runtime=_lambda.Runtime.PYTHON_3_7,
+        # frontend_bucket = _s3.Bucket(self, "frontendBucket",
+        #                              website_index_document="index.html",
+        #                              public_read_access=True,
+        #                              block_public_access=_s3.BlockPublicAccess(
+        #                                  block_public_acls=False,
+        #                                  block_public_policy=False
+        #                              ))
+        my_lambda = _lambda.Function(self, id='lambdafunction', function_name="formlambda", runtime=_lambda.Runtime.PYTHON_3_9,
                                      handler='index.handler',
                                      code=_lambda.Code.from_asset(
                                          os.path.join("./", "lambda-handler")),
