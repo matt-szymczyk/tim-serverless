@@ -41,7 +41,7 @@ class ServerlessBackendStack(Stack):
         #                                  block_public_acls=False,
         #                                  block_public_policy=False
         #                              ))
-        my_lambda = _lambda.Function(self, id='lambdafunction', function_name="formlambda", runtime=_lambda.Runtime.PYTHON_3_9,
+        my_lambda = _lambda.Function(self, id='lambdafunction', function_name="formlambda", runtime=_lambda.Runtime.PYTHON_3_12,
                                      handler='index.handler',
                                      code=_lambda.Code.from_asset(
                                          os.path.join("./", "lambda-handler")),
