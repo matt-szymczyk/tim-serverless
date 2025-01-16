@@ -320,6 +320,18 @@ def handler(event, context):
                 body = {"error": str(pe)}
                 return build_response(statusCode, body, headers)
 
+            # Check if item already exists
+            resp = table.get_item(
+                Key={
+                    "PK": f"WAREHOUSE#{warehouse_id}",
+                    "SK": f"ITEM#{item_id}"
+                }
+            )
+            if "Item" in resp:
+                statusCode = 400
+                body = {"error": f"Item {item_id} already exists in warehouse {warehouse_id}."}
+                return build_response(statusCode, body, headers)
+
             table.put_item(
                 Item={
                     "PK": f"WAREHOUSE#{warehouse_id}",
