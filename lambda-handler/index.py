@@ -1,6 +1,6 @@
 import json
 import boto3
-# from decimal import Decimal
+from decimal import Decimal
 import os
 import time
 
@@ -116,37 +116,33 @@ def handler(event, context):
             #  - then get the METADATA row for each to build a list
             # Production: consider using a GSI to find all warehouse partitions
             # that user_id has an access row in.
-            try:
-                resp = table.scan()
-                items = resp.get("Items", [])
+            resp = table.scan()
+            items = resp.get("Items", [])
 
-                # Step 1: collect all warehouses user can access
-                user_warehouses = set()
-                for it in items:
-                    if (it["SK"].startswith("ACCESS#") 
-                        and it["SK"] == f"ACCESS#{authorized_user_id}"
-                        and it["PK"].startswith("WAREHOUSE#")):
-                        # user has an ACCESS row here
-                        wh_id = it["PK"].replace("WAREHOUSE#", "")
-                        user_warehouses.add(wh_id)
+            # Step 1: collect all warehouses user can access
+            user_warehouses = set()
+            for it in items:
+                if (it["SK"].startswith("ACCESS#") 
+                    and it["SK"] == f"ACCESS#{authorized_user_id}"
+                    and it["PK"].startswith("WAREHOUSE#")):
+                    # user has an ACCESS row here
+                    wh_id = it["PK"].replace("WAREHOUSE#", "")
+                    user_warehouses.add(wh_id)
 
-                # Step 2: get the METADATA items for those warehouses
-                results = []
-                for it in items:
-                    if it["SK"] == "METADATA":
-                        wh_id = it["PK"].replace("WAREHOUSE#", "")
-                        if wh_id in user_warehouses:
-                            results.append({
-                                "warehouseId": wh_id,
-                                "warehouseName": it.get("warehouseName", ""),
-                                "createdAt": it.get("createdAt")
-                            })
+            # Step 2: get the METADATA items for those warehouses
+            results = []
+            for it in items:
+                if it["SK"] == "METADATA":
+                    wh_id = it["PK"].replace("WAREHOUSE#", "")
+                    if wh_id in user_warehouses:
+                        results.append({
+                            "warehouseId": wh_id,
+                            "warehouseName": it.get("warehouseName", ""),
+                            "createdAt": it.get("createdAt")
+                        })
 
-                body = results
-            except Exception as e:
-                statusCode = 500
-                body = {"error": f"Failed to list warehouses: {str(e)}"}
-                return build_response(statusCode, body, headers)
+            body = results
+
         # 1C) GET WAREHOUSE (GET /warehouses/{warehouseId})
         elif route_key == "GET /warehouses/{warehouseId}":
             warehouse_id = path_parameters.get("warehouseId")
@@ -329,7 +325,7 @@ def handler(event, context):
                     "PK": f"WAREHOUSE#{warehouse_id}",
                     "SK": f"ITEM#{item_id}",
                     "itemName": item_name,
-                    "quantity": int(quantity)
+                    "quantity": Decimal(str(quantity))
                 }
             )
             body = {"message": f"Created item {item_id} in warehouse {warehouse_id}."}
@@ -411,7 +407,7 @@ def handler(event, context):
                 expression_values[":nm"] = new_name
             if new_quantity is not None:
                 update_expr.append("quantity = :qt")
-                expression_values[":qt"] = int(new_quantity)
+                expression_values[":qt"] = Decimal(str(new_quantity))
 
             if update_expr:
                 table.update_item(
@@ -464,10 +460,16 @@ def handler(event, context):
 
     return build_response(statusCode, body, headers)
 
+class DecimalEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, Decimal):
+            # convert to str or float
+            return float(obj)
+        return super(DecimalEncoder, self).default(obj)
 
 def build_response(status_code, body, headers):
     return {
         "statusCode": status_code,
         "headers": headers,
-        "body": json.dumps(body)
+        "body": json.dumps(body, cls=DecimalEncoder)
     }
